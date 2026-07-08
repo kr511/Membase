@@ -25,9 +25,11 @@ app/
 ├── main.py                  # FastAPI app factory, middleware, /health
 ├── api/v1/memory.py         # POST /api/v1/memories and /api/v1/memories/search
 ├── core/config.py           # pydantic-settings (SUPABASE_URL, SUPABASE_SERVICE_KEY)
+├── core/security.py         # bearer auth: resolves mb_live_ keys to tenants
 ├── models/schemas.py        # request/response models, 384-dim validation
 └── services/supabase_db.py  # async Supabase client, inserts, match_memories RPC
 client_sdk/mock_client.py    # runnable E2EE proof-of-concept client
+tests/test_api.py            # auth + validation contract tests (pytest)
 frontend/index.html          # dashboard: signup/login + personal API key
 supabase/schema.sql          # idempotent schema for the Supabase SQL Editor
 supabase/setup_db.py         # connection check + insert/search smoke test
@@ -94,13 +96,18 @@ Interactive docs: <http://localhost:8000/docs> · Health check: `GET /health`
 
 ## 5. Test the endpoints
 
+All memory endpoints require your personal API key (`mb_live_…`), which is
+minted automatically when you register via the web dashboard (section 7).
+The tenant identity is always derived server-side from the key — requests
+never contain a `user_id`.
+
 **Store an encrypted memory** (`embedding` must be exactly 384 floats):
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/memories \
+  -H "Authorization: Bearer mb_live_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d "{
-    \"user_id\": \"demo-user-001\",
     \"encrypted_content\": \"BASE64_AES_GCM_CIPHERTEXT\",
     \"embedding\": [$(python3 -c 'print(",".join(["0.01"]*384))')]
   }"
@@ -110,24 +117,32 @@ curl -X POST http://localhost:8000/api/v1/memories \
 
 ```bash
 curl -X POST http://localhost:8000/api/v1/memories/search \
+  -H "Authorization: Bearer mb_live_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d "{
-    \"user_id\": \"demo-user-001\",
     \"query_embedding\": [$(python3 -c 'print(",".join(["0.01"]*384))')],
     \"limit\": 5,
     \"threshold\": 0.3
   }"
 ```
 
-The response contains only `encrypted_content` and similarity scores — the
-server cannot decrypt anything it returns.
+Requests without a valid key are rejected with `401`. The response contains
+only `encrypted_content` and similarity scores — the server cannot decrypt
+anything it returns.
+
+**Run the test suite:**
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
 
 ## 6. End-to-end proof: the mock client
 
-With the API running, execute:
+With the API running and your key from the dashboard, execute:
 
 ```bash
-python client_sdk/mock_client.py
+MEMBASE_API_KEY=mb_live_YOUR_KEY python client_sdk/mock_client.py
 ```
 
 It encrypts a sample text locally with AES-256-GCM, generates a simulated
@@ -174,8 +189,15 @@ dashboard already logged in (supabase-js picks up the session from the URL).
 
 - **Zero knowledge:** plaintext and encryption keys never leave the client.
   The API validates shape (384 dims, non-empty ciphertext) but cannot read content.
-- **Tenant isolation:** every query is filtered by `user_id` inside the
-  `match_memories` SQL function.
+- **API-key authentication:** every memory endpoint requires
+  `Authorization: Bearer mb_live_…`. Keys are minted per user by a database
+  trigger at signup and resolved server-side to the tenant identity —
+  clients can never choose or spoof a `user_id`.
+- **Tenant isolation:** every query is filtered by the key owner's
+  `user_id` inside the `match_memories` SQL function.
+- **Locked-down database:** RLS is enabled on all tables. `memories` has no
+  policies (backend-only via service role); `user_api_keys` is readable only
+  by its owner; the signup trigger function is not callable via REST.
 - **Key handling:** the Supabase service role key lives exclusively in the
   server's environment (`.env` is git-ignored).
 - Metadata (embedding vectors, timestamps, sizes) is visible to the backend

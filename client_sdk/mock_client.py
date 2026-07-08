@@ -26,6 +26,9 @@ import httpx
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 API_BASE_URL = os.environ.get("MEMBASE_API_URL", "http://localhost:8000")
+# Your personal key from the MemBase dashboard (frontend/index.html).
+# The API derives your identity from this key — no user_id is ever sent.
+API_KEY = os.environ.get("MEMBASE_API_KEY", "mb_live_demo_key_replace_me")
 EMBEDDING_DIMENSIONS = 384
 NONCE_SIZE = 12  # bytes, recommended for AES-GCM
 
@@ -55,7 +58,6 @@ def main() -> int:
     print("=== MemBase mock client: end-to-end encryption demo ===\n")
 
     # --- happens ONLY on the user's machine -------------------------------
-    user_id = "demo-user-001"
     user_key = AESGCM.generate_key(bit_length=256)  # never leaves the client
     plaintext = "The user's cat is called Schrödinger and prefers tuna."
 
@@ -73,11 +75,14 @@ def main() -> int:
 
     # --- talk to the API ---------------------------------------------------
     try:
-        with httpx.Client(base_url=API_BASE_URL, timeout=10.0) as client:
+        with httpx.Client(
+            base_url=API_BASE_URL,
+            timeout=10.0,
+            headers={"Authorization": f"Bearer {API_KEY}"},
+        ) as client:
             store = client.post(
                 "/api/v1/memories",
                 json={
-                    "user_id": user_id,
                     "encrypted_content": ciphertext_b64,
                     "embedding": embedding,
                 },
@@ -89,7 +94,6 @@ def main() -> int:
             search = client.post(
                 "/api/v1/memories/search",
                 json={
-                    "user_id": user_id,
                     "query_embedding": embedding,
                     "limit": 3,
                     "threshold": 0.3,
@@ -105,7 +109,11 @@ def main() -> int:
                 print(f"[local]    decrypted locally: {decrypt(match['encrypted_content'], user_key)}")
     except httpx.HTTPStatusError as exc:
         print(f"[api]    API error {exc.response.status_code}: {exc.response.text}")
-        print("[api]    Is your Supabase project configured in .env and the migration applied?")
+        if exc.response.status_code == 401:
+            print("[api]    Register in the dashboard, copy your mb_live_ key, then run:")
+            print("[api]    MEMBASE_API_KEY=mb_live_... python client_sdk/mock_client.py")
+        else:
+            print("[api]    Is your Supabase project configured in .env and the migration applied?")
         print("[api]    The crypto demo above already proves the E2EE concept.")
         return 1
     except httpx.HTTPError as exc:
