@@ -28,7 +28,9 @@ app/
 ├── models/schemas.py        # request/response models, 384-dim validation
 └── services/supabase_db.py  # async Supabase client, inserts, match_memories RPC
 client_sdk/mock_client.py    # runnable E2EE proof-of-concept client
-supabase/migrations/         # SQL schema (pgvector table + RPC function)
+supabase/schema.sql          # idempotent schema for the Supabase SQL Editor
+supabase/setup_db.py         # connection check + insert/search smoke test
+supabase/migrations/         # versioned SQL migration (same schema)
 ```
 
 ## 1. Setup
@@ -67,8 +69,19 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
-This enables the `vector` extension, creates the `memories` table (with an
-HNSW cosine index), and installs the `match_memories()` RPC function.
+Both files (`supabase/schema.sql` and the migration) are idempotent and
+enable the `vector` extension, create the `memories` table (with an HNSW
+cosine index), and install the `match_memories()` RPC function.
+
+**Validate the setup:** after applying the schema, run
+
+```bash
+python supabase/setup_db.py
+```
+
+It checks your `.env` credentials, verifies the schema is reachable, inserts
+a test vector, retrieves it via the `match_memories` RPC, and cleans up —
+with step-by-step guidance if anything is missing.
 
 ## 4. Run the API
 
