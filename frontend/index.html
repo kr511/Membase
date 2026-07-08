@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="de" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MemBase — Zero-Knowledge Memory Dashboard</title>
+
+  <!-- Tailwind CSS (CDN build, fine for a dashboard prototype) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Official Supabase JS SDK v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* Cyberpunk glow accents on top of Tailwind */
+    :root { color-scheme: dark; }
+    body {
+      background:
+        radial-gradient(ellipse 80% 50% at 50% -20%, rgba(34, 211, 238, 0.15), transparent),
+        radial-gradient(ellipse 60% 40% at 80% 110%, rgba(168, 85, 247, 0.12), transparent),
+        #06060c;
+    }
+    .glow-cyan   { box-shadow: 0 0 24px rgba(34, 211, 238, 0.25), 0 0 2px rgba(34, 211, 238, 0.6); }
+    .glow-border { border: 1px solid rgba(34, 211, 238, 0.35); }
+    .neon-text   { text-shadow: 0 0 12px rgba(34, 211, 238, 0.8); }
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+      background-size: 32px 32px;
+    }
+  </style>
+</head>
+
+<body class="min-h-screen text-slate-200 antialiased grid-bg flex items-center justify-center p-4">
+
+  <!-- ======================================================================
+       STATE 1: LOGGED OUT — login / registration card
+       ====================================================================== -->
+  <main id="view-auth" class="hidden w-full max-w-md">
+    <div class="bg-slate-950/80 backdrop-blur glow-border glow-cyan rounded-2xl p-8">
+      <div class="flex items-center gap-3 mb-2">
+        <i data-lucide="brain-circuit" class="w-9 h-9 text-cyan-400"></i>
+        <h1 class="text-3xl font-bold tracking-tight text-white">
+          Mem<span class="text-cyan-400 neon-text">Base</span>
+        </h1>
+      </div>
+      <p class="text-sm text-slate-400 mb-8">
+        Zero-Knowledge Memory für lokale KIs. Dein Klartext verlässt nie deinen Rechner.
+      </p>
+
+      <form id="auth-form" class="space-y-4">
+        <div>
+          <label for="email" class="block text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-1.5">
+            E-Mail
+          </label>
+          <input id="email" type="email" required autocomplete="email"
+                 placeholder="du@beispiel.de"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 outline-none px-4 py-2.5 text-sm placeholder-slate-600 transition" />
+        </div>
+        <div>
+          <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-1.5">
+            Passwort
+          </label>
+          <input id="password" type="password" required minlength="8" autocomplete="current-password"
+                 placeholder="••••••••"
+                 class="w-full rounded-lg bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/30 outline-none px-4 py-2.5 text-sm placeholder-slate-600 transition" />
+        </div>
+
+        <!-- error / info feedback -->
+        <p id="auth-message" class="hidden text-sm rounded-lg px-4 py-3"></p>
+
+        <div class="flex gap-3 pt-2">
+          <button type="submit" data-action="login"
+                  class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold py-2.5 text-sm transition glow-cyan disabled:opacity-50 disabled:cursor-wait">
+            <i data-lucide="log-in" class="w-4 h-4"></i> Einloggen
+          </button>
+          <button type="submit" data-action="register"
+                  class="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-fuchsia-500/60 text-fuchsia-300 hover:bg-fuchsia-500/10 font-semibold py-2.5 text-sm transition disabled:opacity-50 disabled:cursor-wait">
+            <i data-lucide="user-plus" class="w-4 h-4"></i> Registrieren
+          </button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- ======================================================================
+       STATE 2: LOGGED IN — the dashboard
+       ====================================================================== -->
+  <main id="view-dashboard" class="hidden w-full max-w-2xl">
+    <div class="bg-slate-950/80 backdrop-blur glow-border glow-cyan rounded-2xl p-8">
+      <header class="flex items-start justify-between gap-4 mb-8">
+        <div>
+          <div class="flex items-center gap-3">
+            <i data-lucide="brain-circuit" class="w-8 h-8 text-cyan-400"></i>
+            <h1 class="text-2xl font-bold text-white">
+              Mem<span class="text-cyan-400 neon-text">Base</span> Dashboard
+            </h1>
+          </div>
+          <p class="text-sm text-slate-400 mt-2">
+            Willkommen zurück, <span id="user-email" class="text-cyan-300 font-medium"></span>
+          </p>
+        </div>
+        <button id="btn-logout"
+                class="inline-flex items-center gap-2 rounded-lg border border-slate-700 hover:border-red-400/60 hover:text-red-300 px-4 py-2 text-sm text-slate-300 transition">
+          <i data-lucide="log-out" class="w-4 h-4"></i> Logout
+        </button>
+      </header>
+
+      <!-- Protected area: the personal API key -->
+      <section class="rounded-xl border border-fuchsia-500/30 bg-slate-900/60 p-6">
+        <div class="flex items-center gap-2 mb-1">
+          <i data-lucide="key-round" class="w-5 h-5 text-fuchsia-400"></i>
+          <h2 class="font-semibold text-white">Dein MemBase API-Key</h2>
+        </div>
+        <p class="text-xs text-slate-500 mb-4">
+          Nutze diesen Key im <code class="text-fuchsia-300">Authorization</code>-Header deines Clients.
+          Behandle ihn wie ein Passwort.
+        </p>
+
+        <div class="flex items-center gap-2">
+          <code id="api-key-display"
+                class="flex-1 truncate rounded-lg bg-black/60 border border-slate-800 px-4 py-3 font-mono text-sm text-cyan-300 select-all">
+            Lade&hellip;
+          </code>
+          <button id="btn-toggle-key" title="Key ein-/ausblenden" aria-label="Key ein-/ausblenden"
+                  class="rounded-lg border border-slate-700 hover:border-cyan-400/60 hover:text-cyan-300 p-3 text-slate-400 transition">
+            <i data-lucide="eye" class="w-4 h-4 pointer-events-none"></i>
+          </button>
+          <button id="btn-copy-key" title="In Zwischenablage kopieren" aria-label="Key kopieren"
+                  class="rounded-lg border border-slate-700 hover:border-cyan-400/60 hover:text-cyan-300 p-3 text-slate-400 transition">
+            <i data-lucide="copy" class="w-4 h-4 pointer-events-none"></i>
+          </button>
+        </div>
+
+        <p id="key-message" class="hidden text-sm rounded-lg px-4 py-3 mt-4"></p>
+      </section>
+
+      <footer class="mt-6 flex items-center gap-2 text-xs text-slate-600">
+        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500/70"></i>
+        End-to-End verschlüsselt — das Backend sieht niemals deinen Klartext.
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+
+    /* =====================================================================
+     * SUPABASE-INITIALISIERUNG
+     *
+     * Trage hier die Werte DEINES Supabase-Projekts ein
+     * (Dashboard -> Projekt -> Settings -> API):
+     *
+     *   SUPABASE_URL  = "Project URL"
+     *   SUPABASE_KEY  = "anon public" key ODER der neue "publishable" key
+     *
+     * Beide Werte sind für den Browser bestimmt und daher NICHT geheim —
+     * die Datensicherheit erzwingt Row Level Security in der Datenbank.
+     * NIEMALS den service_role-Key hier eintragen!
+     *
+     * Die vorausgefüllten Werte gehören zum Projekt "MemBase"
+     * (sppfarqxzjkicbsbsyll, eu-central-1).
+     * ===================================================================== */
+    const SUPABASE_URL = "https://sppfarqxzjkicbsbsyll.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_PKeoEmNPoxrmwJUNHXScTw_VO2ZtFvh";
+
+    const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    /* ------------------------------------------------------------------ */
+    /* DOM references                                                      */
+    /* ------------------------------------------------------------------ */
+    const viewAuth      = document.getElementById("view-auth");
+    const viewDashboard = document.getElementById("view-dashboard");
+    const authForm      = document.getElementById("auth-form");
+    const authMessage   = document.getElementById("auth-message");
+    const userEmailEl   = document.getElementById("user-email");
+    const keyDisplay    = document.getElementById("api-key-display");
+    const keyMessage    = document.getElementById("key-message");
+    const btnToggleKey  = document.getElementById("btn-toggle-key");
+    const btnCopyKey    = document.getElementById("btn-copy-key");
+    const btnLogout     = document.getElementById("btn-logout");
+
+    /* Local UI state */
+    let apiKey = null;        // the real key, kept only in memory
+    let keyVisible = false;   // masked by default
+
+    const MASK = "•".repeat(40); // ••••…
+
+    /* ------------------------------------------------------------------ */
+    /* Small UI helpers                                                    */
+    /* ------------------------------------------------------------------ */
+    function showMessage(el, text, kind) {
+      el.textContent = text;
+      el.classList.remove("hidden", "bg-red-500/10", "text-red-300", "bg-emerald-500/10",
+                          "text-emerald-300", "bg-cyan-500/10", "text-cyan-300");
+      const styles = {
+        error:   ["bg-red-500/10", "text-red-300"],
+        success: ["bg-emerald-500/10", "text-emerald-300"],
+        info:    ["bg-cyan-500/10", "text-cyan-300"],
+      };
+      el.classList.add(...styles[kind]);
+    }
+
+    function hideMessage(el) {
+      el.classList.add("hidden");
+    }
+
+    function setBusy(busy) {
+      authForm.querySelectorAll("button").forEach((b) => (b.disabled = busy));
+    }
+
+    /** Re-render Lucide icons after any innerHTML change. */
+    function refreshIcons() {
+      window.lucide.createIcons();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* State switching: logged out <-> logged in                           */
+    /* ------------------------------------------------------------------ */
+    async function renderForSession(session) {
+      if (session) {
+        viewAuth.classList.add("hidden");
+        viewDashboard.classList.remove("hidden");
+        userEmailEl.textContent = session.user.email;
+        await loadApiKey();
+      } else {
+        viewDashboard.classList.add("hidden");
+        viewAuth.classList.remove("hidden");
+        apiKey = null;
+        keyVisible = false;
+      }
+      refreshIcons();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Auth: login & registration                                          */
+    /* ------------------------------------------------------------------ */
+    authForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      hideMessage(authMessage);
+
+      const action   = event.submitter?.dataset.action ?? "login";
+      const email    = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      setBusy(true);
+      try {
+        if (action === "register") {
+          const { data, error } = await db.auth.signUp({ email, password });
+          if (error) throw error;
+          if (!data.session) {
+            // Email confirmation is enabled: no session until the link is clicked.
+            showMessage(authMessage,
+              "Registrierung erfolgreich! Bitte bestätige deine E-Mail-Adresse und logge dich danach ein.",
+              "success");
+            return;
+          }
+          // Confirmation disabled: signUp returns a live session right away.
+        } else {
+          const { error } = await db.auth.signInWithPassword({ email, password });
+          if (error) throw error;
+        }
+        // onAuthStateChange below takes care of switching to the dashboard.
+      } catch (error) {
+        showMessage(authMessage, error.message ?? "Unbekannter Fehler.", "error");
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    btnLogout.addEventListener("click", async () => {
+      await db.auth.signOut();
+    });
+
+    /* ------------------------------------------------------------------ */
+    /* API key: fetch (RLS returns only the caller's row), mask, copy      */
+    /* ------------------------------------------------------------------ */
+    async function loadApiKey() {
+      hideMessage(keyMessage);
+      keyDisplay.textContent = "Lade…";
+      const { data, error } = await db
+        .from("user_api_keys")
+        .select("api_key")
+        .maybeSingle();
+
+      if (error) {
+        keyDisplay.textContent = "—";
+        showMessage(keyMessage, `Key konnte nicht geladen werden: ${error.message}`, "error");
+        return;
+      }
+      if (!data) {
+        keyDisplay.textContent = "—";
+        showMessage(keyMessage,
+          "Noch kein API-Key vorhanden. Bitte kurz warten und die Seite neu laden.",
+          "info");
+        return;
+      }
+      apiKey = data.api_key;
+      keyVisible = false;
+      renderKey();
+    }
+
+    function renderKey() {
+      keyDisplay.textContent = apiKey ? (keyVisible ? apiKey : MASK) : "—";
+      btnToggleKey.innerHTML =
+        `<i data-lucide="${keyVisible ? "eye-off" : "eye"}" class="w-4 h-4 pointer-events-none"></i>`;
+      refreshIcons();
+    }
+
+    btnToggleKey.addEventListener("click", () => {
+      if (!apiKey) return;
+      keyVisible = !keyVisible;
+      renderKey();
+    });
+
+    btnCopyKey.addEventListener("click", async () => {
+      if (!apiKey) return;
+      try {
+        await navigator.clipboard.writeText(apiKey);
+        btnCopyKey.innerHTML = `<i data-lucide="check" class="w-4 h-4 pointer-events-none text-emerald-400"></i>`;
+        refreshIcons();
+        setTimeout(() => {
+          btnCopyKey.innerHTML = `<i data-lucide="copy" class="w-4 h-4 pointer-events-none"></i>`;
+          refreshIcons();
+        }, 1500);
+      } catch {
+        showMessage(keyMessage, "Kopieren fehlgeschlagen — bitte Key manuell markieren.", "error");
+      }
+    });
+
+    /* ------------------------------------------------------------------ */
+    /* Boot: restore an existing session, then react to auth changes       */
+    /* ------------------------------------------------------------------ */
+    db.auth.getSession().then(({ data: { session } }) => renderForSession(session));
+    db.auth.onAuthStateChange((_event, session) => renderForSession(session));
+  </script>
+</body>
+</html>

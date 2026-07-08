@@ -28,6 +28,7 @@ app/
 ├── models/schemas.py        # request/response models, 384-dim validation
 └── services/supabase_db.py  # async Supabase client, inserts, match_memories RPC
 client_sdk/mock_client.py    # runnable E2EE proof-of-concept client
+frontend/index.html          # dashboard: signup/login + personal API key
 supabase/schema.sql          # idempotent schema for the Supabase SQL Editor
 supabase/setup_db.py         # connection check + insert/search smoke test
 supabase/migrations/         # versioned SQL migration (same schema)
@@ -133,6 +134,24 @@ It encrypts a sample text locally with AES-256-GCM, generates a simulated
 384-dim embedding, stores it via the API, runs a search, and decrypts the
 result locally — printing at each step what the cloud sees (ciphertext)
 versus what only the client can see (plaintext).
+
+## 7. Web dashboard (signup & API key)
+
+`frontend/index.html` is a self-contained dashboard (Tailwind, Lucide and
+supabase-js via CDN — no build step). Users register / log in with
+Supabase Auth; a database trigger (`supabase/migrations/api_keys.sql`)
+automatically mints a personal `mb_live_…` API key on signup, which the
+dashboard shows masked with reveal/copy controls.
+
+Open the file directly in a browser, or serve it locally:
+
+```bash
+python3 -m http.server 3000 --directory frontend
+```
+
+The Supabase URL and the **public** anon/publishable key are configured at
+the top of the inline script — Row Level Security ensures users can only
+ever read their own key. Never put the service_role key in the frontend.
 
 ## Security model
 
