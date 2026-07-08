@@ -250,7 +250,15 @@
       setBusy(true);
       try {
         if (action === "register") {
-          const { data, error } = await db.auth.signUp({ email, password });
+          // Send the confirmation link back to THIS page (works locally and
+          // on GitHub Pages). The URL must be allow-listed in Supabase under
+          // Authentication -> URL Configuration -> Redirect URLs.
+          const redirectTo = window.location.origin + window.location.pathname;
+          const { data, error } = await db.auth.signUp({
+            email,
+            password,
+            options: { emailRedirectTo: redirectTo },
+          });
           if (error) throw error;
           if (!data.session) {
             // Email confirmation is enabled: no session until the link is clicked.

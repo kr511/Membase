@@ -153,6 +153,23 @@ The Supabase URL and the **public** anon/publishable key are configured at
 the top of the inline script — Row Level Security ensures users can only
 ever read their own key. Never put the service_role key in the frontend.
 
+### Deploy to GitHub Pages
+
+`.github/workflows/deploy-pages.yml` publishes `frontend/` automatically on
+every push. One-time setup:
+
+1. **GitHub:** repo **Settings → Pages → Source: "GitHub Actions"**
+   (the repo must be public, or Pages requires a paid plan).
+   The dashboard then lives at `https://<owner>.github.io/<repo>/`.
+2. **Supabase:** Dashboard → **Authentication → URL Configuration**:
+   - set **Site URL** to the Pages URL, and
+   - add it to **Redirect URLs** (plus `http://localhost:3000` for local dev).
+
+Without step 2 the signup confirmation e-mail would redirect users to
+`localhost` instead of the live page. The page passes `emailRedirectTo`
+on signup, so after clicking the confirmation link users land back on the
+dashboard already logged in (supabase-js picks up the session from the URL).
+
 ## Security model
 
 - **Zero knowledge:** plaintext and encryption keys never leave the client.
