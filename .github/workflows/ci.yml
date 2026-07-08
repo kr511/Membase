@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [claude/membase-e2ee-backend-hi1u7o]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run tests
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_KEY: test-service-key
+        run: pytest -v
