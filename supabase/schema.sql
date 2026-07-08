@@ -34,7 +34,10 @@ create index if not exists idx_memories_embedding_hnsw
 
 -- 4. Cosine similarity search, callable via PostgREST RPC.
 --    similarity = 1 - cosine_distance; rows below match_threshold are dropped.
-create or replace function public.match_memories(
+--    Drop first so the return type can evolve across re-runs.
+drop function if exists public.match_memories(vector(384), float, int, text);
+
+create function public.match_memories(
     query_embedding vector(384),
     match_threshold float,
     match_count     int,
@@ -42,7 +45,6 @@ create or replace function public.match_memories(
 )
 returns table (
     id                uuid,
-    user_id           text,
     encrypted_content text,
     similarity        float,
     created_at        timestamptz
@@ -52,7 +54,6 @@ stable
 as $$
     select
         m.id,
-        m.user_id,
         m.encrypted_content,
         1 - (m.embedding <=> query_embedding) as similarity,
         m.created_at
