@@ -1,9 +1,14 @@
-"""Memory endpoints: store encrypted chunks and search them by vector."""
+"""Memory endpoints: store encrypted chunks and search them by vector.
+
+All routes require a valid MemBase API key (Authorization: Bearer
+mb_live_...). The tenant identity is derived from the key server-side.
+"""
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.core.security import get_current_user_id
 from app.models.schemas import (
     MemoryCreate,
     MemoryCreated,
@@ -25,10 +30,13 @@ router = APIRouter(prefix="/memories", tags=["memories"])
     status_code=status.HTTP_201_CREATED,
     summary="Store an encrypted memory",
 )
-async def create_memory(payload: MemoryCreate) -> MemoryCreated:
+async def create_memory(
+    payload: MemoryCreate,
+    user_id: str = Depends(get_current_user_id),
+) -> MemoryCreated:
     """Persist ciphertext + embedding. The server never sees plaintext."""
     try:
-        record = await supabase_db.insert_memory(payload)
+        record = await supabase_db.insert_memory(user_id, payload)
     except DatabaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)
@@ -44,12 +52,15 @@ async def create_memory(payload: MemoryCreate) -> MemoryCreated:
 @router.post(
     "/search",
     response_model=SearchResponse,
-    summary="Cosine similarity search over a tenant's memories",
+    summary="Cosine similarity search over the caller's memories",
 )
-async def search_memories(payload: MemorySearch) -> SearchResponse:
+async def search_memories(
+    payload: MemorySearch,
+    user_id: str = Depends(get_current_user_id),
+) -> SearchResponse:
     """Return the closest encrypted memories for the given query embedding."""
     try:
-        rows = await supabase_db.match_memories(payload)
+        rows = await supabase_db.match_memories(user_id, payload)
     except DatabaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)

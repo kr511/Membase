@@ -25,9 +25,12 @@ Embedding = Annotated[
 
 
 class MemoryCreate(BaseModel):
-    """Payload to store one encrypted memory chunk."""
+    """Payload to store one encrypted memory chunk.
 
-    user_id: str = Field(..., min_length=1, description="Tenant identifier.")
+    The tenant is derived server-side from the API key — clients cannot
+    choose a user_id.
+    """
+
     encrypted_content: str = Field(
         ...,
         min_length=1,
@@ -38,9 +41,8 @@ class MemoryCreate(BaseModel):
 
 
 class MemorySearch(BaseModel):
-    """Payload for a cosine similarity search over a tenant's memories."""
+    """Payload for a cosine similarity search over the caller's memories."""
 
-    user_id: str = Field(..., min_length=1, description="Tenant identifier.")
     query_embedding: Embedding
     limit: int = Field(default=5, ge=1, le=100, description="Maximum number of matches.")
     threshold: float = Field(
