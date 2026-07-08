@@ -103,6 +103,11 @@ def main() -> int:
                 print(f"[cloud]    similarity={match['similarity']:.3f} "
                       f"content={match['encrypted_content'][:40]}...")
                 print(f"[local]    decrypted locally: {decrypt(match['encrypted_content'], user_key)}")
+    except httpx.HTTPStatusError as exc:
+        print(f"[api]    API error {exc.response.status_code}: {exc.response.text}")
+        print("[api]    Is your Supabase project configured in .env and the migration applied?")
+        print("[api]    The crypto demo above already proves the E2EE concept.")
+        return 1
     except httpx.HTTPError as exc:
         print(f"[api]    API not reachable at {API_BASE_URL} ({exc.__class__.__name__}).")
         print("[api]    Start it with: uvicorn app.main:app --reload")
