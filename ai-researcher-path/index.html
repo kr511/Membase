@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>AI Researcher Path</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">DEIN LERNPFAD</p>
+        <h1>AI Researcher Path</h1>
+      </div>
+      <button id="resetBtn" class="icon-btn" aria-label="Fortschritt zurücksetzen">↻</button>
+    </header>
+
+    <main>
+      <section class="hero-card">
+        <div>
+          <p class="muted">Aktueller Fortschritt</p>
+          <h2 id="progressText">0 von 12 Lektionen</h2>
+        </div>
+        <div class="progress-ring" id="progressRing">
+          <span id="progressPercent">0%</span>
+        </div>
+      </section>
+
+      <section class="today-card">
+        <div class="badge">HEUTIGE LEKTION</div>
+        <h2 id="todayTitle">Python-Grundlagen</h2>
+        <p id="todayDescription">Lerne die Basis, die du für KI wirklich brauchst.</p>
+        <button id="continueBtn" class="primary-btn">Lektion öffnen</button>
+      </section>
+
+      <section>
+        <div class="section-heading">
+          <h2>Lernpfad</h2>
+          <span class="muted">12 Schritte</span>
+        </div>
+        <div id="lessonList" class="lesson-list"></div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav">
+      <button class="nav-item active" data-view="home">⌂<span>Start</span></button>
+      <button class="nav-item" data-view="path">▤<span>Pfad</span></button>
+      <button class="nav-item" data-view="stats">◔<span>Fortschritt</span></button>
+    </nav>
+  </div>
+
+  <dialog id="lessonDialog">
+    <div class="dialog-header">
+      <div>
+        <p id="dialogModule" class="eyebrow"></p>
+        <h2 id="dialogTitle"></h2>
+      </div>
+      <button id="closeDialog" class="icon-btn">✕</button>
+    </div>
+
+    <div id="dialogContent" class="dialog-content"></div>
+
+    <div class="dialog-actions">
+      <button id="completeBtn" class="primary-btn">Als erledigt markieren</button>
+    </div>
+  </dialog>
+
+  <dialog id="statsDialog">
+    <div class="dialog-header">
+      <h2>Dein Fortschritt</h2>
+      <button id="closeStats" class="icon-btn">✕</button>
+    </div>
+    <div class="dialog-content">
+      <div class="stat-grid">
+        <div class="stat-card"><strong id="statDone">0</strong><span>Erledigt</span></div>
+        <div class="stat-card"><strong id="statOpen">12</strong><span>Offen</span></div>
+        <div class="stat-card"><strong id="statPercent">0%</strong><span>Fortschritt</span></div>
+      </div>
+      <h3>Nächster Schwerpunkt</h3>
+      <p id="nextFocus" class="muted"></p>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
